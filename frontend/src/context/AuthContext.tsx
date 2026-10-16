@@ -2,11 +2,13 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { apiFetch, setToken, clearToken, getToken } from "../api/client";
 import { MeResponse, UserBrief, TeamMembership } from "../api/types";
 
-interface AuthContextType {
+export interface AuthContextType {
   user: UserBrief | null;
   memberships: TeamMembership[];
   selectedTeamId: number | null; // null represents "All my teams"
   setSelectedTeamId: (teamId: number | null) => void;
+  teamFilter: string;
+  setTeamFilter: (filter: string) => void;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -14,7 +16,7 @@ interface AuthContextType {
   refreshMe: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserBrief | null>(null);
@@ -89,6 +91,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         memberships,
         selectedTeamId,
         setSelectedTeamId: handleSetSelectedTeamId,
+        teamFilter: selectedTeamId === null ? "all" : String(selectedTeamId),
+        setTeamFilter: (val: string) => handleSetSelectedTeamId(val === "all" ? null : Number(val)),
         isAuthenticated: !!user,
         isLoading,
         login,
