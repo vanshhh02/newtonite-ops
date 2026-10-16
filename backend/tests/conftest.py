@@ -4,6 +4,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from app.config import settings
 from app.models import Base
+from app.database import get_db
+from app.main import app
 
 # Ensure tests point to TEST_DATABASE_URL
 TEST_DB_URL = os.getenv("TEST_DATABASE_URL", settings.TEST_DATABASE_URL)
@@ -11,7 +13,7 @@ os.environ["DATABASE_URL"] = TEST_DB_URL
 
 test_engine = create_engine(
     TEST_DB_URL,
-    pool_size=30,
+    pool_size=40,
     max_overflow=20,
     pool_pre_ping=True,
 )
@@ -22,7 +24,6 @@ TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_eng
 def setup_test_database():
     """Ensure test database schema and triggers are fully applied."""
     with test_engine.connect() as conn:
-        # Create schema if not present
         Base.metadata.create_all(conn)
         
         # Ensure append-only trigger exists
@@ -44,6 +45,15 @@ def setup_test_database():
     yield
 
 
+@pytest.fixture(autouse=True)
+def clean_database():
+    """Clean tables before each test to ensure test isolation."""
+    with test_engine.connect() as conn:
+        conn.execute(text("TRUNCATE notifications, activity_events, work_items, idempotency_keys, outbox, team_memberships, users, teams RESTART IDENTITY CASCADE;"))
+        conn.commit()
+    yield
+
+
 @pytest.fixture
 def db() -> Session:
     """Provide a clean test database session."""
@@ -52,6 +62,21 @@ def db() -> Session:
         yield session
     finally:
         session.close()
+
+
+@pytest.fixture(autouse=True)
+def override_db():
+    """Override FastAPI get_db dependency to point to test database."""
+    def _get_test_db():
+        session = TestSessionLocal()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = _get_test_db
+    yield
+    app.dependency_overrides.pop(get_db, None)
 
 
 def get_test_db_session() -> Session:
