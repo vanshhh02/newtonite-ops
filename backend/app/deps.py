@@ -52,7 +52,7 @@ def get_current_user(
 
 
 def get_item_and_role(
-    item_id: int,
+    id: int,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Tuple[WorkItem, str]:
@@ -63,7 +63,7 @@ def get_item_and_role(
     If the caller does not belong to the item's team, return 404 Not Found.
     Never return 403 for items outside caller's teams to prevent enumerating item IDs or team existence.
     """
-    item = db.query(WorkItem).filter(WorkItem.id == item_id).first()
+    item = db.query(WorkItem).filter(WorkItem.id == id).first()
     if not item:
         raise AppException(
             status_code=404,
