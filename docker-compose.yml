@@ -1,0 +1,72 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: newtonite-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: newtonite
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d newtonite"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: newtonite-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/newtonite
+      SECRET_KEY: dev-secret-key-change-in-production-use-hs256
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 1440
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000
+      STALE_AFTER_HOURS: 72
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "8000:8000"
+    command: ["/bin/sh", "/app/entrypoint.sh"]
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: newtonite-worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/newtonite
+      WORKER_POLL_INTERVAL_SECONDS: 2
+      WORKER_BATCH_SIZE: 20
+      PYTHONUNBUFFERED: "1"
+    command: ["python", "-m", "app.worker"]
+
+  # TODO: Web frontend service (built separately)
+  # Uncomment when frontend/Dockerfile is available:
+  # web:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: newtonite-web
+  #   ports:
+  #     - "5173:5173"
+  #   depends_on:
+  #     - api
+
+volumes:
+  pgdata:
