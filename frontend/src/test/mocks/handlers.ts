@@ -36,6 +36,16 @@ export const mockItem: Item = {
   allowed_actions: ["claim", "assign", "edit", "change_priority", "comment", "transition:in_progress"],
 };
 
+export let activeMockItem: Item = { ...mockItem };
+
+export function resetActiveMockItem() {
+  activeMockItem = { ...mockItem };
+}
+
+export function setActiveMockItem(updated: Partial<Item>) {
+  activeMockItem = { ...activeMockItem, ...updated };
+}
+
 export const handlers = [
   // GET /me
   http.get("http://localhost:8000/me", () => {
@@ -127,7 +137,7 @@ export const handlers = [
   // GET /items/:id
   http.get("http://localhost:8000/items/:id", ({ params }) => {
     return HttpResponse.json({
-      ...mockItem,
+      ...activeMockItem,
       id: Number(params.id),
       key: `OPS-${params.id}`,
     });
