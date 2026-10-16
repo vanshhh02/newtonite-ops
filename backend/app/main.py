@@ -6,7 +6,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
 from app.exceptions import AppException
-from app.api import auth, items, notifications
+from app.api import auth, items, notifications, dashboard
 
 app = FastAPI(
     title="Newtonite Ops API",
@@ -83,6 +83,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 app.include_router(auth.router)
 app.include_router(items.router)
 app.include_router(notifications.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/health", tags=["health"])
