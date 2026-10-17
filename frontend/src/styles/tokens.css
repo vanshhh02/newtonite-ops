@@ -1,15 +1,15 @@
 :root {
-  /* Surface Colors */
-  --bg-app: #101114;
-  --bg-surface: #181a1f;
-  --bg-surface-hover: #1f2229;
-  --bg-elevated: #242730;
-  --bg-input: #121317;
+  /* Surface Colors matching photo reference */
+  --bg-app: #33353b;
+  --bg-surface: #121316;
+  --bg-surface-hover: #1a1c21;
+  --bg-elevated: #25272e;
+  --bg-input: #0e0f12;
   --bg-overlay: rgba(10, 11, 14, 0.75);
 
   /* Border Colors */
-  --border-subtle: #262933;
-  --border-default: #323642;
+  --border-subtle: rgba(255, 255, 255, 0.1);
+  --border-default: rgba(255, 255, 255, 0.16);
   --border-focus: #6366f1;
 
   /* Typography Colors */

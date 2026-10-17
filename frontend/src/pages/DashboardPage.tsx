@@ -2,53 +2,21 @@ import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchDashboardSummary, fetchItems } from "../api/items";
-import { ItemRow } from "../components/ItemRow";
 import { ItemSummary } from "../api/types";
+import { getStatusMeta } from "../constants";
 
 interface AttentionCategory {
   key: "assigned_to_me" | "unassigned_urgent" | "awaiting_my_approval" | "overdue" | "stale";
   label: string;
   countKey: "assigned_to_me" | "unassigned_urgent" | "awaiting_my_approval" | "overdue" | "stale";
-  variant: "has-items" | "has-urgent" | "has-approval" | "has-overdue";
-  description: string;
 }
 
 const ATTENTION_CATEGORIES: AttentionCategory[] = [
-  {
-    key: "assigned_to_me",
-    label: "Assigned to Me",
-    countKey: "assigned_to_me",
-    variant: "has-items",
-    description: "Items waiting on your active contribution",
-  },
-  {
-    key: "unassigned_urgent",
-    label: "Unassigned Urgent",
-    countKey: "unassigned_urgent",
-    variant: "has-urgent",
-    description: "Urgent items needing immediate ownership",
-  },
-  {
-    key: "awaiting_my_approval",
-    label: "Awaiting My Approval",
-    countKey: "awaiting_my_approval",
-    variant: "has-approval",
-    description: "Items pending team lead review & sign-off",
-  },
-  {
-    key: "overdue",
-    label: "Overdue",
-    countKey: "overdue",
-    variant: "has-overdue",
-    description: "Items that have exceeded target resolution time",
-  },
-  {
-    key: "stale",
-    label: "Stale Items",
-    countKey: "stale",
-    variant: "has-items",
-    description: "No activity recorded in the past 24 hours",
-  },
+  { key: "assigned_to_me", label: "Assigned to me", countKey: "assigned_to_me" },
+  { key: "unassigned_urgent", label: "Unassigned urgent", countKey: "unassigned_urgent" },
+  { key: "awaiting_my_approval", label: "Awaiting my approval", countKey: "awaiting_my_approval" },
+  { key: "overdue", label: "Overdue", countKey: "overdue" },
+  { key: "stale", label: "Stale", countKey: "stale" },
 ];
 
 export const DashboardPage: React.FC = () => {
@@ -101,30 +69,15 @@ export const DashboardPage: React.FC = () => {
   const previewItems: ItemSummary[] = previewData?.items || [];
 
   return (
-    <div>
-      {/* Dashboard Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: "20px",
-          flexWrap: "wrap",
-          gap: "12px",
-        }}
-      >
-        <div>
-          <h1 style={{ fontSize: "20px", fontWeight: "700", color: "var(--text-primary)" }}>
-            Operations Command Center
-          </h1>
-          <p style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: "2px" }}>
-            Real-time attention queues and workload distribution across all teams.
-          </p>
-        </div>
-
-        <Link to="/items/new" className="btn-primary" style={{ textDecoration: "none" }}>
-          + New Item
-        </Link>
+    <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "8px 0" }}>
+      {/* 1. Header (Matching Reference Photo) */}
+      <div style={{ marginBottom: "22px" }}>
+        <h1 style={{ fontSize: "22px", fontWeight: "700", color: "#ffffff", letterSpacing: "-0.01em" }}>
+          Attention needed
+        </h1>
+        <p style={{ color: "#9ca3af", fontSize: "14px", marginTop: "4px" }}>
+          Work that needs action from you or your team.
+        </p>
       </div>
 
       {/* Summary Error Banner */}
@@ -137,123 +90,174 @@ export const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* Attention Cards Grid */}
-      <div className="dashboard-cards-grid">
+      {/* 2. 5 Attention Cards in Single Horizontal Row (Matching Reference Photo) */}
+      <div
+        className="dashboard-cards-grid"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(5, 1fr)",
+          gap: "12px",
+          marginBottom: "24px",
+        }}
+      >
         {ATTENTION_CATEGORIES.map((cat) => {
           const count = counts[cat.countKey];
-          const hasCount = count > 0;
           return (
             <Link
               key={cat.key}
               to={`/items?view=${cat.key}`}
-              className={`attention-card ${hasCount ? cat.variant : ""}`}
+              className="attention-card"
               data-testid={`card-${cat.key}`}
+              style={{
+                backgroundColor: "#111215",
+                border: "1px solid rgba(255, 255, 255, 0.14)",
+                borderRadius: "8px",
+                padding: "20px 18px",
+                display: "block",
+                textDecoration: "none",
+                transition: "all 0.15s ease",
+              }}
             >
-              <div>
-                <div className="attention-card-count">
-                  {isLoadingSummary ? "—" : count}
-                </div>
-                <div className="attention-card-label">{cat.label}</div>
+              <div
+                style={{
+                  fontSize: "30px",
+                  fontWeight: "700",
+                  color: "#ffffff",
+                  lineHeight: "1",
+                  marginBottom: "10px",
+                  fontFamily: "var(--font-sans)",
+                }}
+              >
+                {isLoadingSummary ? "—" : count}
               </div>
               <div
                 style={{
-                  fontSize: "11px",
-                  color: "var(--text-muted)",
-                  marginTop: "12px",
-                  lineHeight: "1.3",
+                  fontSize: "13px",
+                  fontWeight: "500",
+                  color: "#9ca3af",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
                 }}
               >
-                {cat.description}
+                {cat.label}
               </div>
             </Link>
           );
         })}
       </div>
 
-      {/* Top-5 Preview Section */}
-      <div style={{ marginTop: "12px" }}>
+      {/* 3. First Up Section (Matching Reference Photo) */}
+      <div
+        style={{
+          backgroundColor: "#111215",
+          border: "1px solid rgba(255, 255, 255, 0.14)",
+          borderRadius: "8px",
+          padding: "24px",
+        }}
+      >
         <div
           style={{
             display: "flex",
             alignItems: "baseline",
             justifyContent: "space-between",
-            marginBottom: "14px",
-            flexWrap: "wrap",
-            gap: "8px",
+            marginBottom: "18px",
           }}
         >
-          <div>
-            <h2 style={{ fontSize: "16px", fontWeight: "600", color: "var(--text-primary)" }}>
-              Top Priority Preview: {firstNonEmpty.label}
-            </h2>
-            <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-              Top 5 items requiring active attention right now
-            </span>
-          </div>
+          <h2 style={{ fontSize: "18px", fontWeight: "700", color: "#ffffff" }}>
+            First up
+          </h2>
 
           <Link
             to={`/items?view=${firstNonEmpty.key}`}
             style={{
-              fontSize: "13px",
-              color: "var(--accent-primary)",
-              fontWeight: "500",
+              fontSize: "12px",
+              color: "#9ca3af",
               textDecoration: "none",
             }}
           >
-            View all {counts[firstNonEmpty.countKey]} items →
+            View all ({counts[firstNonEmpty.countKey]}) →
           </Link>
         </div>
 
-        {/* Table for Top-5 Preview */}
-        <div className="table-container">
-          <table className="data-table" aria-label="Top priority items preview">
-            <thead>
-              <tr>
-                <th scope="col">Key</th>
-                <th scope="col">Title</th>
-                <th scope="col">Type</th>
-                <th scope="col">Priority</th>
-                <th scope="col">Status</th>
-                <th scope="col">Assignee</th>
-                <th scope="col">Due Date</th>
-                <th scope="col" style={{ textAlign: "right" }}>
-                  Updated
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoadingPreview && (
-                <tr>
-                  <td colSpan={8} style={{ textAlign: "center", padding: "32px" }}>
-                    <div style={{ color: "var(--text-secondary)" }}>Loading preview items...</div>
-                  </td>
-                </tr>
-              )}
+        {/* Loading & Error States */}
+        {isLoadingPreview && (
+          <div style={{ color: "#9ca3af", fontSize: "13px", padding: "16px 0" }}>
+            Loading attention items...
+          </div>
+        )}
 
-              {isPreviewError && (
-                <tr>
-                  <td colSpan={8} style={{ textAlign: "center", padding: "24px", color: "#f87171" }}>
-                    Failed to load preview items.
-                  </td>
-                </tr>
-              )}
+        {isPreviewError && (
+          <div style={{ color: "#f87171", fontSize: "13px", padding: "12px 0" }}>
+            Failed to load attention items.
+          </div>
+        )}
 
-              {!isLoadingPreview && previewItems.length === 0 && (
-                <tr>
-                  <td colSpan={8}>
-                    <div className="empty-state" style={{ padding: "32px 16px" }}>
-                      <h3>No attention items</h3>
-                      <p>All items in this attention view have been handled!</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
+        {!isLoadingPreview && previewItems.length === 0 && (
+          <div style={{ color: "#9ca3af", fontSize: "13px", padding: "12px 0" }}>
+            No items currently need immediate attention in this view.
+          </div>
+        )}
 
-              {!isLoadingPreview &&
-                previewItems.map((item) => <ItemRow key={item.id} item={item} />)}
-            </tbody>
-          </table>
-        </div>
+        {/* Clean Row Layout: Key | Title | Status */}
+        {!isLoadingPreview &&
+          previewItems.map((item) => {
+            const statusLabel = getStatusMeta(item.status).label;
+            return (
+              <Link
+                key={item.id}
+                to={`/items/${item.id}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "12px 0",
+                  borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+                  textDecoration: "none",
+                  transition: "opacity 0.15s ease",
+                }}
+              >
+                <span
+                  style={{
+                    width: "110px",
+                    color: "#8e8e8e",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "13px",
+                    fontWeight: "500",
+                    flexShrink: 0,
+                  }}
+                >
+                  {item.key}
+                </span>
+
+                <span
+                  style={{
+                    flex: 1,
+                    color: "#f1f5f9",
+                    fontSize: "14px",
+                    fontWeight: "500",
+                    paddingRight: "16px",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                  title={item.title}
+                >
+                  {item.title}
+                </span>
+
+                <span
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: "13px",
+                    textAlign: "right",
+                    flexShrink: 0,
+                  }}
+                >
+                  {statusLabel}
+                </span>
+              </Link>
+            );
+          })}
       </div>
     </div>
   );

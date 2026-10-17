@@ -70,18 +70,19 @@ export const AppShell: React.FC = () => {
           zIndex: 40,
         }}
       >
-        {/* Left: Brand & Nav Links */}
-        <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
+        {/* Left: Brand & Nav Links with Team & User Inline */}
+        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
           <Link
             to="/"
             style={{
               fontSize: "16px",
               fontWeight: "700",
               letterSpacing: "-0.02em",
-              color: "var(--text-primary)",
+              color: "#ffffff",
               display: "flex",
               alignItems: "center",
               gap: "8px",
+              textDecoration: "none",
             }}
           >
             <span>Newtonite Ops</span>
@@ -92,12 +93,14 @@ export const AppShell: React.FC = () => {
               to="/"
               end
               style={({ isActive }) => ({
-                padding: "6px 12px",
-                borderRadius: "var(--radius-md)",
+                padding: "6px 14px",
+                borderRadius: "6px",
                 fontSize: "13px",
                 fontWeight: "500",
-                color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-                backgroundColor: isActive ? "var(--bg-elevated)" : "transparent",
+                color: isActive ? "#ffffff" : "#9ca3af",
+                backgroundColor: isActive ? "#27282e" : "transparent",
+                textDecoration: "none",
+                transition: "all 0.15s ease",
               })}
             >
               Dashboard
@@ -105,12 +108,14 @@ export const AppShell: React.FC = () => {
             <NavLink
               to="/items"
               style={({ isActive }) => ({
-                padding: "6px 12px",
-                borderRadius: "var(--radius-md)",
+                padding: "6px 14px",
+                borderRadius: "6px",
                 fontSize: "13px",
                 fontWeight: "500",
-                color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-                backgroundColor: isActive ? "var(--bg-elevated)" : "transparent",
+                color: isActive ? "#ffffff" : "#9ca3af",
+                backgroundColor: isActive ? "#27282e" : "transparent",
+                textDecoration: "none",
+                transition: "all 0.15s ease",
               })}
             >
               Items
@@ -118,31 +123,33 @@ export const AppShell: React.FC = () => {
             <NavLink
               to="/items/new"
               style={({ isActive }) => ({
-                padding: "6px 12px",
-                borderRadius: "var(--radius-md)",
+                padding: "6px 14px",
+                borderRadius: "6px",
                 fontSize: "13px",
                 fontWeight: "500",
-                color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-                backgroundColor: isActive ? "var(--bg-elevated)" : "transparent",
+                color: isActive ? "#ffffff" : "#9ca3af",
+                backgroundColor: isActive ? "#27282e" : "transparent",
+                textDecoration: "none",
+                transition: "all 0.15s ease",
               })}
             >
               New item
             </NavLink>
           </nav>
-        </div>
 
-        {/* Right: Team Switcher, Notifications & User */}
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          {/* Team Switcher */}
+          {/* Team Switcher Inline */}
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <select
               className="select"
               style={{
-                fontSize: "12px",
-                padding: "4px 10px",
-                height: "30px",
+                fontSize: "13px",
+                padding: "4px 8px",
+                height: "28px",
                 width: "auto",
-                border: "1px solid var(--border-subtle)",
+                border: "none",
+                backgroundColor: "transparent",
+                color: "#9ca3af",
+                cursor: "pointer",
               }}
               value={selectedTeamId === null ? "all" : String(selectedTeamId)}
               onChange={(e) => {
@@ -159,7 +166,16 @@ export const AppShell: React.FC = () => {
             </select>
           </div>
 
-          <span style={{ color: "var(--border-default)" }}>&bull;</span>
+          <span style={{ color: "#6b7280" }}>•</span>
+
+          {/* Current User Name Inline */}
+          <span style={{ fontSize: "13px", color: "#9ca3af", fontWeight: "500" }}>
+            {user?.name || "V. Agarwal"}
+          </span>
+        </div>
+
+        {/* Right: Notifications & Logout Menu */}
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
 
           {/* Notifications Bell Dropdown */}
           <div style={{ position: "relative" }}>

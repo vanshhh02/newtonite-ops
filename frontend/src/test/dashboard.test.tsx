@@ -62,9 +62,9 @@ describe("Dashboard Page (Screen 3)", () => {
   it("renders top-5 preview for the first non-empty view", async () => {
     renderDashboard();
 
-    // First non-empty view is 'Assigned to Me' (count: 4)
+    // First non-empty view is 'Assigned to me' (count: 4)
     await waitFor(() => {
-      expect(screen.getByText(/Top Priority Preview: Assigned to Me/i)).toBeInTheDocument();
+      expect(screen.getByText(/First up/i)).toBeInTheDocument();
       expect(screen.getByText("Database connection pool exhaustion")).toBeInTheDocument();
     });
   });
