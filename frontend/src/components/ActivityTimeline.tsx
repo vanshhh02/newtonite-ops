@@ -53,7 +53,6 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
 
   const serverEvents = data?.pages.flatMap((p) => p.events) ?? [];
 
-  // Submit comment with optimistic update & rollback/retry on failure
   const handleSendComment = async (optComment?: OptimisticComment) => {
     let targetKey = optComment ? optComment.idempotencyKey : generateIdempotencyKey();
     let textToSend = optComment ? optComment.body : commentText.trim();
@@ -74,7 +73,6 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
       setOptimisticComments((prev) => [newOptimistic, ...prev]);
       setCommentText("");
     } else {
-      // Retrying failed comment with same idempotency key
       setOptimisticComments((prev) =>
         prev.map((c) => (c.localId === localId ? { ...c, status: "sending" } : c))
       );
@@ -84,11 +82,9 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
 
     try {
       await addComment(itemId, textToSend, targetKey);
-      // Success: Remove optimistic comment from state and invalidate query
       setOptimisticComments((prev) => prev.filter((c) => c.localId !== localId));
       await queryClient.invalidateQueries({ queryKey: ["activity", itemId] });
     } catch {
-      // Mark as failed and allow retry with same idempotency key
       setOptimisticComments((prev) =>
         prev.map((c) => (c.localId === localId ? { ...c, status: "failed" } : c))
       );
@@ -103,150 +99,120 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
 
     switch (event.type) {
       case "created":
-        return <span>{actor} created this work item.</span>;
-      case "claimed":
-        return <span>{actor} claimed this item.</span>;
-      case "released":
-        return <span>{actor} released this item back to unassigned.</span>;
-      case "assigned":
-        return (
-          <span>
-            {actor} assigned this item to{" "}
-            <strong>{p.to ? p.to.name : "unassigned"}</strong>.
-          </span>
-        );
+        return `${actor} created this item`;
       case "status_changed":
-        return (
-          <div>
-            <span>
-              {actor} transitioned status from <strong>{p.from}</strong> to{" "}
-              <strong>{p.to}</strong>.
-            </span>
-            {p.reason && (
-              <div style={{ marginTop: "4px", color: "var(--text-secondary)", fontStyle: "italic" }}>
-                "{p.reason}"
-              </div>
-            )}
-          </div>
-        );
-      case "priority_changed":
-        return (
-          <span>
-            {actor} updated priority from <strong>{p.from}</strong> to <strong>{p.to}</strong>.
-          </span>
-        );
-      case "edited":
-        return (
-          <span>
-            {actor} edited details: {p.fields ? p.fields.join(", ") : "information updated"}.
-          </span>
-        );
-      case "comment_added":
-        return <div style={{ whiteSpace: "pre-wrap", marginTop: "4px" }}>{p.body}</div>;
-      default:
-        return <span>{actor} performed {event.type}</span>;
-    }
-  };
-
-  const getEventIcon = (type: string) => {
-    switch (type) {
-      case "comment_added":
-        return "💬";
-      case "status_changed":
-        return "🔄";
-      case "claimed":
-        return "🙋";
-      case "released":
-        return "↩️";
+        return `${actor} changed status to ${p.to_status ? p.to_status.replace("_", " ") : "updated"}`;
       case "assigned":
-        return "👤";
+        return `${actor} assigned this to ${p.assignee_name || "the team"}`;
+      case "claimed":
+        return `${actor} claimed this item`;
+      case "released":
+        return `${actor} released this item`;
       case "priority_changed":
-        return "⚡";
+        return `${actor} changed priority to ${p.to_priority || "updated"}`;
+      case "comment_added":
+        return `${actor}: "${p.body || ""}"`;
       case "edited":
-        return "✏️";
-      case "created":
-        return "✨";
+        return `${actor} edited item details`;
       default:
-        return "📝";
+        return `${actor} performed ${event.type}`;
     }
   };
 
   return (
-    <div style={{ marginTop: "24px" }}>
-      <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "16px" }}>
-        Activity & Comments
-      </h3>
+    <div>
+      <h2 style={{ fontSize: "18px", fontWeight: "700", color: "#ffffff", marginBottom: "14px" }}>
+        Activity
+      </h2>
 
-      {/* Comment Input Box */}
+      {/* Add a comment section */}
       {canComment && (
         <div style={{ marginBottom: "20px" }}>
-          <textarea
-            className="textarea"
-            rows={2}
-            placeholder="Write a comment or status update..."
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            disabled={isSubmitting}
-            aria-label="Add a comment"
-          />
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "8px" }}>
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => handleSendComment()}
-              disabled={isSubmitting || !commentText.trim()}
-            >
-              {isSubmitting ? "Posting..." : "Post Comment"}
-            </button>
+          <label
+            htmlFor="activity-comment-input"
+            style={{
+              display: "block",
+              fontSize: "13.5px",
+              color: "#9ca3af",
+              marginBottom: "8px",
+            }}
+          >
+            Add a comment
+          </label>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <input
+              id="activity-comment-input"
+              type="text"
+              className="input"
+              placeholder="Value"
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && commentText.trim()) {
+                  e.preventDefault();
+                  handleSendComment();
+                }
+              }}
+              disabled={isSubmitting}
+              style={{
+                backgroundColor: "#16171b",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                borderRadius: "8px",
+                padding: "8px 12px",
+                color: "#ffffff",
+                fontSize: "13.5px",
+                flex: 1,
+              }}
+              aria-label="Add a comment"
+            />
+            {commentText.trim() && (
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => handleSendComment()}
+                disabled={isSubmitting}
+                style={{
+                  backgroundColor: "#ffffff",
+                  color: "#111111",
+                  borderRadius: "8px",
+                  padding: "6px 14px",
+                  fontWeight: "500",
+                  fontSize: "13px",
+                }}
+              >
+                {isSubmitting ? "Posting..." : "Post"}
+              </button>
+            )}
           </div>
         </div>
       )}
 
-      {/* Optimistic Comments List */}
+      {/* Optimistic Comments */}
       {optimisticComments.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "12px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px" }}>
           {optimisticComments.map((opt) => (
             <div
               key={opt.localId}
-              className={`timeline-event comment-card ${
-                opt.status === "sending" ? "comment-optimistic" : "comment-failed"
-              }`}
+              style={{
+                padding: "10px 0",
+                borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+                fontSize: "13.5px",
+              }}
             >
-              <div className="timeline-icon">💬</div>
-              <div className="timeline-body">
-                <div className="timeline-meta">
-                  <strong>{opt.actor_name}</strong>
-                  <div>
-                    {opt.status === "sending" ? (
-                      <span style={{ color: "var(--accent-primary)", fontSize: "11px" }}>
-                        Sending...
-                      </span>
-                    ) : (
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ color: "#f87171", fontSize: "11px" }}>Failed</span>
-                        <button
-                          type="button"
-                          className="btn-secondary"
-                          style={{ fontSize: "11px", padding: "2px 6px" }}
-                          onClick={() => handleSendComment(opt)}
-                          disabled={isSubmitting}
-                        >
-                          Retry
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div style={{ whiteSpace: "pre-wrap" }}>{opt.body}</div>
+              <div style={{ color: "#ffffff", fontWeight: "400", marginBottom: "2px" }}>
+                {opt.actor_name}: "{opt.body}"
+              </div>
+              <div style={{ fontSize: "12px", color: opt.status === "sending" ? "#9ca3af" : "#f87171" }}>
+                {opt.status === "sending" ? "Posting..." : "Failed to post"}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Loading & Error States */}
+      {/* Loading / Error states */}
       {isLoading && (
-        <div style={{ color: "var(--text-secondary)", fontSize: "13px", padding: "16px 0" }}>
+        <div style={{ color: "#9ca3af", fontSize: "13px", padding: "12px 0" }}>
           Loading activity timeline...
         </div>
       )}
@@ -260,10 +226,10 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
         </div>
       )}
 
-      {/* Timeline Events List */}
-      <div className="timeline-container">
+      {/* Activity Timeline List (Matching Reference Photo) */}
+      <div style={{ display: "flex", flexDirection: "column" }}>
         {!isLoading && serverEvents.length === 0 && optimisticComments.length === 0 && (
-          <div style={{ color: "var(--text-muted)", fontSize: "13px" }}>
+          <div style={{ color: "#71717a", fontSize: "13px", padding: "12px 0" }}>
             No activity recorded yet for this item.
           </div>
         )}
@@ -271,37 +237,35 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
         {serverEvents.map((event) => (
           <div
             key={event.id}
-            className={`timeline-event ${event.type === "comment_added" ? "comment-card" : ""}`}
             data-testid={`event-${event.id}`}
+            style={{
+              padding: "12px 0",
+              borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+              fontSize: "13.5px",
+            }}
           >
-            <div className="timeline-icon">{getEventIcon(event.type)}</div>
-            <div className="timeline-body">
-              <div className="timeline-meta">
-                <strong style={{ color: "var(--text-primary)" }}>
-                  {event.actor?.name || "System"}
-                </strong>
-                <span
-                  title={formatAbsoluteDate(event.created_at)}
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  {formatRelativeTime(event.created_at)}
-                </span>
-              </div>
-              <div style={{ color: "var(--text-primary)" }}>{renderEventDescription(event)}</div>
+            <div style={{ color: "#ffffff", marginBottom: "3px", lineHeight: "1.4" }}>
+              {renderEventDescription(event)}
+            </div>
+            <div
+              title={formatAbsoluteDate(event.created_at)}
+              style={{ color: "#71717a", fontSize: "12px" }}
+            >
+              {formatRelativeTime(event.created_at)}
             </div>
           </div>
         ))}
 
-        {/* Keyset Cursor Pagination for older events */}
         {hasNextPage && (
-          <div style={{ textAlign: "center", paddingTop: "8px" }}>
+          <div style={{ textAlign: "center", paddingTop: "12px" }}>
             <button
               type="button"
               className="btn-secondary"
-              disabled={isFetchingNextPage}
               onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              style={{ fontSize: "12px", padding: "6px 14px", borderRadius: "8px" }}
             >
-              {isFetchingNextPage ? "Loading older events..." : "Load older activity"}
+              {isFetchingNextPage ? "Loading older activity..." : "Load older activity"}
             </button>
           </div>
         )}

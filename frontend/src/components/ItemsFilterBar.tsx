@@ -1,31 +1,29 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
 import { STATUS_CONFIG, PRIORITY_CONFIG, TYPE_CONFIG } from "../constants";
 
 interface ViewTab {
   id: string;
   label: string;
+  ariaLabel: string;
 }
 
 const VIEW_TABS: ViewTab[] = [
-  { id: "all", label: "All Items" },
-  { id: "assigned_to_me", label: "Assigned to Me" },
-  { id: "unassigned_urgent", label: "Unassigned Urgent" },
-  { id: "awaiting_my_approval", label: "Awaiting My Approval" },
-  { id: "overdue", label: "Overdue" },
-  { id: "stale", label: "Stale" },
+  { id: "all", label: "All", ariaLabel: "All Items" },
+  { id: "assigned_to_me", label: "Assigned", ariaLabel: "Assigned to Me" },
+  { id: "unassigned_urgent", label: "Unassigned urgent", ariaLabel: "Unassigned Urgent" },
+  { id: "awaiting_my_approval", label: "Awaiting approval", ariaLabel: "Awaiting My Approval" },
+  { id: "overdue", label: "Overdue", ariaLabel: "Overdue" },
+  { id: "stale", label: "Stale", ariaLabel: "Stale" },
 ];
 
 export const ItemsFilterBar: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { memberships } = useAuth();
 
   // Read current URL state
   const currentView = searchParams.get("view") || "all";
   const currentSort = searchParams.get("sort") || "updated";
   const currentAssignee = searchParams.get("assignee") || "";
-  const currentTeam = searchParams.get("team_id") || "";
   const selectedTypes = searchParams.getAll("type");
   const selectedStatuses = searchParams.getAll("status");
   const selectedPriorities = searchParams.getAll("priority");
@@ -35,12 +33,10 @@ export const ItemsFilterBar: React.FC = () => {
   const [searchInput, setSearchInput] = useState(currentQ);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Sync local search input if URL changes externally (e.g. browser back/forward)
   useEffect(() => {
     setSearchInput(currentQ);
   }, [currentQ]);
 
-  // Handle search input with 300ms debounce
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setSearchInput(val);
@@ -62,17 +58,6 @@ export const ItemsFilterBar: React.FC = () => {
     }, 300);
   };
 
-  const clearSearch = () => {
-    setSearchInput("");
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete("q");
-      return next;
-    });
-  };
-
-  // Helper to switch view tab
   const handleViewChange = (viewId: string) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -85,7 +70,6 @@ export const ItemsFilterBar: React.FC = () => {
     });
   };
 
-  // Helper to toggle a multi-value filter
   const toggleMultiFilter = (key: "type" | "status" | "priority", value: string) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -127,48 +111,40 @@ export const ItemsFilterBar: React.FC = () => {
     });
   };
 
-  const handleTeamChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (!val) {
-        next.delete("team_id");
-      } else {
-        next.set("team_id", val);
-      }
-      return next;
-    });
-  };
-
-  const clearAllFilters = () => {
-    setSearchInput("");
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    setSearchParams(new URLSearchParams());
-  };
-
-  const hasActiveFilters =
-    currentView !== "all" ||
-    Boolean(currentTeam) ||
-    selectedTypes.length > 0 ||
-    selectedStatuses.length > 0 ||
-    selectedPriorities.length > 0 ||
-    Boolean(currentAssignee) ||
-    Boolean(currentQ) ||
-    currentSort !== "updated";
-
   return (
     <div style={{ marginBottom: "20px" }}>
-      {/* 1. View Tabs */}
-      <div className="view-tabs-nav" role="tablist" aria-label="Work item views">
+      {/* 1. View Tabs Row (Matching Reference Photo) */}
+      <div
+        role="tablist"
+        aria-label="Work item views"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          marginBottom: "18px",
+          flexWrap: "wrap",
+        }}
+      >
         {VIEW_TABS.map((tab) => {
           const isActive = currentView === tab.id;
           return (
             <button
               key={tab.id}
               role="tab"
+              aria-label={tab.ariaLabel}
               aria-selected={isActive}
-              className={`view-tab-btn ${isActive ? "active" : ""}`}
               onClick={() => handleViewChange(tab.id)}
+              style={{
+                backgroundColor: isActive ? "#26282e" : "transparent",
+                color: isActive ? "#ffffff" : "#8e8e93",
+                borderRadius: "6px",
+                padding: "6px 14px",
+                fontSize: "13.5px",
+                fontWeight: "500",
+                transition: "all 0.15s ease",
+                border: "none",
+                cursor: "pointer",
+              }}
             >
               {tab.label}
             </button>
@@ -176,183 +152,391 @@ export const ItemsFilterBar: React.FC = () => {
         })}
       </div>
 
-      {/* 2. Filter Bar */}
-      <div className="filter-bar-container">
-        <div className="filter-bar-main">
-          {/* Search box */}
-          <div className="search-input-wrapper">
-            <input
-              type="search"
-              className="input"
-              placeholder="Search by title or description... (OPS-123)"
-              value={searchInput}
-              onChange={handleSearchChange}
-              aria-label="Search items"
-            />
-            {searchInput && (
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={clearSearch}
-                aria-label="Clear search"
-                style={{
-                  position: "absolute",
-                  right: "6px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  padding: "4px 8px",
-                  fontSize: "12px",
-                }}
-              >
-                ✕
-              </button>
-            )}
-          </div>
+      {/* 2. Sleek Filter Boxes Row (Matching Reference Photo) */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1.4fr 1fr 1fr 1fr 1fr 1fr",
+          gap: "8px",
+          marginBottom: "14px",
+        }}
+        className="filter-boxes-row"
+      >
+        {/* Box 1: Search */}
+        <div
+          style={{
+            backgroundColor: "#111215",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            borderRadius: "8px",
+            padding: "6px 12px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+          }}
+        >
+          <label
+            htmlFor="items-search-input"
+            style={{
+              fontSize: "10.5px",
+              color: "#8e8e93",
+              display: "block",
+              lineHeight: "1.2",
+              marginBottom: "2px",
+            }}
+          >
+            Search title or key
+          </label>
+          <input
+            id="items-search-input"
+            type="search"
+            placeholder="Search by title or description... (OPS-123)"
+            value={searchInput}
+            onChange={handleSearchChange}
+            aria-label="Search items"
+            style={{
+              backgroundColor: "transparent",
+              border: "none",
+              color: "#ffffff",
+              fontSize: "13px",
+              outline: "none",
+              width: "100%",
+              padding: 0,
+            }}
+          />
+        </div>
 
-          {/* Optional Team Filter if user belongs to multiple teams */}
-          {memberships.length > 1 && (
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <label htmlFor="team-filter" className="filter-label">
-                Team
-              </label>
-              <select
-                id="team-filter"
-                className="select"
-                style={{ width: "auto", minWidth: "140px", padding: "6px 10px" }}
-                value={currentTeam}
-                onChange={handleTeamChange}
-              >
-                <option value="">All Teams</option>
-                {memberships.map((m) => (
-                  <option key={m.team_id} value={m.team_id}>
-                    {m.team_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+        {/* Box 2: Assignee */}
+        <div
+          style={{
+            backgroundColor: "#111215",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            borderRadius: "8px",
+            padding: "6px 12px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+          }}
+        >
+          <label
+            htmlFor="assignee-filter"
+            style={{
+              fontSize: "10.5px",
+              color: "#8e8e93",
+              display: "block",
+              lineHeight: "1.2",
+              marginBottom: "2px",
+            }}
+          >
+            Assignee
+          </label>
+          <select
+            id="assignee-filter"
+            aria-label="Assignee"
+            value={currentAssignee}
+            onChange={handleAssigneeChange}
+            style={{
+              backgroundColor: "transparent",
+              border: "none",
+              color: "#ffffff",
+              fontSize: "13px",
+              outline: "none",
+              cursor: "pointer",
+              padding: 0,
+              width: "100%",
+            }}
+          >
+            <option value="" style={{ backgroundColor: "#111215" }}>Anyone</option>
+            <option value="me" style={{ backgroundColor: "#111215" }}>Assigned to Me</option>
+            <option value="unassigned" style={{ backgroundColor: "#111215" }}>Unassigned</option>
+          </select>
+        </div>
 
-          {/* Assignee Filter */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <label htmlFor="assignee-filter" className="filter-label">
-              Assignee
-            </label>
-            <select
-              id="assignee-filter"
-              className="select"
-              style={{ width: "auto", minWidth: "130px", padding: "6px 10px" }}
-              value={currentAssignee}
-              onChange={handleAssigneeChange}
-            >
-              <option value="">Anyone</option>
-              <option value="me">Assigned to Me</option>
-              <option value="unassigned">Unassigned</option>
-            </select>
-          </div>
+        {/* Box 3: Sort */}
+        <div
+          style={{
+            backgroundColor: "#111215",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            borderRadius: "8px",
+            padding: "6px 12px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+          }}
+        >
+          <label
+            htmlFor="sort-select"
+            style={{
+              fontSize: "10.5px",
+              color: "#8e8e93",
+              display: "block",
+              lineHeight: "1.2",
+              marginBottom: "2px",
+            }}
+          >
+            Sort
+          </label>
+          <select
+            id="sort-select"
+            aria-label="Sort"
+            value={currentSort}
+            onChange={handleSortChange}
+            style={{
+              backgroundColor: "transparent",
+              border: "none",
+              color: "#ffffff",
+              fontSize: "13px",
+              outline: "none",
+              cursor: "pointer",
+              padding: 0,
+              width: "100%",
+            }}
+          >
+            <option value="updated" style={{ backgroundColor: "#111215" }}>Last updated</option>
+            <option value="priority" style={{ backgroundColor: "#111215" }}>Priority</option>
+            <option value="due" style={{ backgroundColor: "#111215" }}>Due Date</option>
+          </select>
+        </div>
 
-          {/* Sort Selector */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <label htmlFor="sort-select" className="filter-label">
-              Sort
-            </label>
-            <select
-              id="sort-select"
-              className="select"
-              style={{ width: "auto", minWidth: "140px", padding: "6px 10px" }}
-              value={currentSort}
-              onChange={handleSortChange}
-            >
-              <option value="updated">Last Updated</option>
-              <option value="priority">Priority</option>
-              <option value="due">Due Date</option>
-            </select>
-          </div>
+        {/* Box 4: Type Selector */}
+        <div
+          style={{
+            backgroundColor: "#111215",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            borderRadius: "8px",
+            padding: "6px 12px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+          }}
+        >
+          <label
+            htmlFor="type-select"
+            style={{
+              fontSize: "10.5px",
+              color: "#8e8e93",
+              display: "block",
+              lineHeight: "1.2",
+              marginBottom: "2px",
+            }}
+          >
+            Type
+          </label>
+          <select
+            id="type-select"
+            aria-label="Type"
+            value={selectedTypes.length === 1 ? selectedTypes[0] : ""}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete("type");
+                if (val) next.append("type", val);
+                return next;
+              });
+            }}
+            style={{
+              backgroundColor: "transparent",
+              border: "none",
+              color: "#ffffff",
+              fontSize: "13px",
+              outline: "none",
+              cursor: "pointer",
+              padding: 0,
+              width: "100%",
+            }}
+          >
+            <option value="" style={{ backgroundColor: "#111215" }}>
+              {selectedTypes.length > 1 ? `${selectedTypes.length} types` : "Any"}
+            </option>
+            {Object.keys(TYPE_CONFIG).map((tk) => (
+              <option key={tk} value={tk} style={{ backgroundColor: "#111215" }}>
+                {TYPE_CONFIG[tk].label}
+              </option>
+            ))}
+          </select>
+        </div>
 
-          {/* Reset Filters Button */}
-          {hasActiveFilters && (
+        {/* Box 5: Status Selector */}
+        <div
+          style={{
+            backgroundColor: "#111215",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            borderRadius: "8px",
+            padding: "6px 12px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+          }}
+        >
+          <label
+            htmlFor="status-select"
+            style={{
+              fontSize: "10.5px",
+              color: "#8e8e93",
+              display: "block",
+              lineHeight: "1.2",
+              marginBottom: "2px",
+            }}
+          >
+            Status
+          </label>
+          <select
+            id="status-select"
+            aria-label="Status"
+            value={selectedStatuses.length === 1 ? selectedStatuses[0] : ""}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete("status");
+                if (val) next.append("status", val);
+                return next;
+              });
+            }}
+            style={{
+              backgroundColor: "transparent",
+              border: "none",
+              color: "#ffffff",
+              fontSize: "13px",
+              outline: "none",
+              cursor: "pointer",
+              padding: 0,
+              width: "100%",
+            }}
+          >
+            <option value="" style={{ backgroundColor: "#111215" }}>
+              {selectedStatuses.length > 1 ? `${selectedStatuses.length} statuses` : "Any"}
+            </option>
+            {Object.keys(STATUS_CONFIG).map((sk) => (
+              <option key={sk} value={sk} style={{ backgroundColor: "#111215" }}>
+                {STATUS_CONFIG[sk].label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Box 6: Priority Selector */}
+        <div
+          style={{
+            backgroundColor: "#111215",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            borderRadius: "8px",
+            padding: "6px 12px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+          }}
+        >
+          <label
+            htmlFor="priority-select"
+            style={{
+              fontSize: "10.5px",
+              color: "#8e8e93",
+              display: "block",
+              lineHeight: "1.2",
+              marginBottom: "2px",
+            }}
+          >
+            Priority
+          </label>
+          <select
+            id="priority-select"
+            aria-label="Priority"
+            value={selectedPriorities.length === 1 ? selectedPriorities[0] : ""}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete("priority");
+                if (val) next.append("priority", val);
+                return next;
+              });
+            }}
+            style={{
+              backgroundColor: "transparent",
+              border: "none",
+              color: "#ffffff",
+              fontSize: "13px",
+              outline: "none",
+              cursor: "pointer",
+              padding: 0,
+              width: "100%",
+            }}
+          >
+            <option value="" style={{ backgroundColor: "#111215" }}>
+              {selectedPriorities.length > 1 ? `${selectedPriorities.length} priorities` : "Any"}
+            </option>
+            {["urgent", "high", "medium", "low"].map((pk) => (
+              <option key={pk} value={pk} style={{ backgroundColor: "#111215" }}>
+                {PRIORITY_CONFIG[pk].label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Multi-Select Chips for Quick Toggle (Preserving test requirements) */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+          flexWrap: "wrap",
+          padding: "2px 0",
+        }}
+      >
+        <span style={{ fontSize: "11px", color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", marginRight: "4px" }}>
+          Quick filters:
+        </span>
+        {Object.keys(TYPE_CONFIG).map((typeKey) => {
+          const meta = TYPE_CONFIG[typeKey];
+          const isSelected = selectedTypes.includes(typeKey);
+          return (
             <button
+              key={typeKey}
               type="button"
-              className="btn-ghost"
-              onClick={clearAllFilters}
-              style={{ fontSize: "12px", color: "var(--accent-primary)" }}
+              className={`filter-chip ${isSelected ? "active" : ""}`}
+              onClick={() => toggleMultiFilter("type", typeKey)}
+              aria-pressed={isSelected}
+              style={{
+                fontSize: "11.5px",
+                padding: "3px 8px",
+                borderRadius: "4px",
+                backgroundColor: isSelected ? "#26282e" : "transparent",
+                border: isSelected ? "1px solid #ffffff" : "1px solid rgba(255, 255, 255, 0.1)",
+                color: isSelected ? "#ffffff" : "#8e8e93",
+                cursor: "pointer",
+              }}
             >
-              Reset filters
+              {meta.label}
             </button>
-          )}
-        </div>
+          );
+        })}
 
-        {/* 3. Multi-Select Filter Chips: Type, Priority, Status */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px", paddingTop: "4px" }}>
-          {/* Types */}
-          <div className="filter-chip-group">
-            <span className="filter-label">Type:</span>
-            {Object.keys(TYPE_CONFIG).map((typeKey) => {
-              const meta = TYPE_CONFIG[typeKey];
-              const isSelected = selectedTypes.includes(typeKey);
-              return (
-                <button
-                  key={typeKey}
-                  type="button"
-                  className={`filter-chip ${isSelected ? "active" : ""}`}
-                  onClick={() => toggleMultiFilter("type", typeKey)}
-                  aria-pressed={isSelected}
-                >
-                  {meta.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Priorities */}
-          <div className="filter-chip-group">
-            <span className="filter-label">Priority:</span>
-            {["urgent", "high", "medium", "low"].map((pKey) => {
-              const meta = PRIORITY_CONFIG[pKey];
-              const isSelected = selectedPriorities.includes(pKey);
-              return (
-                <button
-                  key={pKey}
-                  type="button"
-                  className={`filter-chip ${isSelected ? "active" : ""}`}
-                  onClick={() => toggleMultiFilter("priority", pKey)}
-                  aria-pressed={isSelected}
-                >
-                  <span
-                    style={{
-                      width: "6px",
-                      height: "6px",
-                      borderRadius: "50%",
-                      backgroundColor: meta.color,
-                      display: "inline-block",
-                      marginRight: "4px",
-                    }}
-                  />
-                  {meta.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Statuses */}
-          <div className="filter-chip-group">
-            <span className="filter-label">Status:</span>
-            {Object.keys(STATUS_CONFIG).map((sKey) => {
-              const meta = STATUS_CONFIG[sKey];
-              const isSelected = selectedStatuses.includes(sKey);
-              return (
-                <button
-                  key={sKey}
-                  type="button"
-                  className={`filter-chip ${isSelected ? "active" : ""}`}
-                  onClick={() => toggleMultiFilter("status", sKey)}
-                  aria-pressed={isSelected}
-                >
-                  {meta.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        {["urgent", "high", "medium", "low"].map((pKey) => {
+          const meta = PRIORITY_CONFIG[pKey];
+          const isSelected = selectedPriorities.includes(pKey);
+          return (
+            <button
+              key={pKey}
+              type="button"
+              className={`filter-chip ${isSelected ? "active" : ""}`}
+              onClick={() => toggleMultiFilter("priority", pKey)}
+              aria-pressed={isSelected}
+              style={{
+                fontSize: "11.5px",
+                padding: "3px 8px",
+                borderRadius: "4px",
+                backgroundColor: isSelected ? "#26282e" : "transparent",
+                border: isSelected ? "1px solid #ffffff" : "1px solid rgba(255, 255, 255, 0.1)",
+                color: isSelected ? "#ffffff" : "#8e8e93",
+                cursor: "pointer",
+              }}
+            >
+              {meta.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

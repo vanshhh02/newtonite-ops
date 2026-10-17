@@ -16,27 +16,59 @@ export const ItemRow: React.FC<ItemRowProps> = React.memo(({ item }) => {
   const dueInfo = formatDueDate(item.due_at);
   const isOverdue = dueInfo.isOverdue && !["resolved", "closed", "cancelled"].includes(item.status);
 
+  // Friendly due display
+  let dueDisplay = "—";
+  if (item.due_at) {
+    if (isOverdue) {
+      dueDisplay = dueInfo.overdueText || "Overdue";
+    } else {
+      dueDisplay = dueInfo.text;
+    }
+  }
+
+  // Friendly assignee display: first name or unassigned
+  const assigneeDisplay = item.assignee ? item.assignee.name.split(" ")[0] : "Unassigned";
+
   return (
-    <tr key={item.id} data-testid={`item-row-${item.id}`}>
-      {/* 1. Item Key */}
-      <td style={{ width: "90px" }}>
-        <Link to={`/items/${item.id}`} className="key-tag" title={`View ${item.key}`}>
+    <tr
+      key={item.id}
+      data-testid={`item-row-${item.id}`}
+      style={{
+        borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+        transition: "background-color 0.15s ease",
+      }}
+    >
+      {/* 1. Item Key (Grey) */}
+      <td style={{ width: "95px", padding: "14px 16px" }}>
+        <Link
+          to={`/items/${item.id}`}
+          style={{
+            color: "#71717a",
+            fontFamily: "var(--font-mono)",
+            fontSize: "13px",
+            fontWeight: "500",
+            textDecoration: "none",
+          }}
+          title={`View ${item.key}`}
+        >
           {item.key}
         </Link>
       </td>
 
-      {/* 2. Title */}
-      <td>
+      {/* 2. Title (Crisp White) */}
+      <td style={{ padding: "14px 16px" }}>
         <Link
           to={`/items/${item.id}`}
           style={{
-            fontWeight: 500,
-            color: "var(--text-primary)",
+            fontWeight: "500",
+            color: "#f4f4f5",
+            fontSize: "13.5px",
             display: "block",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
-            maxWidth: "380px",
+            maxWidth: "360px",
+            textDecoration: "none",
           }}
           title={item.title}
         >
@@ -44,88 +76,43 @@ export const ItemRow: React.FC<ItemRowProps> = React.memo(({ item }) => {
         </Link>
       </td>
 
-      {/* 3. Type */}
-      <td style={{ width: "120px" }}>
-        <span
-          className="badge"
-          style={{
-            color: typeMeta.color,
-            backgroundColor: typeMeta.bg,
-            border: `1px solid ${typeMeta.border}`,
-          }}
-        >
-          {typeMeta.label}
-        </span>
+      {/* 3. Type (Muted grey text) */}
+      <td style={{ width: "110px", padding: "14px 16px", color: "#9ca3af", fontSize: "13.5px" }}>
+        {typeMeta.label}
       </td>
 
-      {/* 4. Priority */}
-      <td style={{ width: "110px" }}>
-        <span
-          className="badge"
-          style={{
-            color: priorityMeta.color,
-            backgroundColor: priorityMeta.bg,
-            border: `1px solid ${priorityMeta.border}`,
-          }}
-        >
-          <span
-            className="badge-dot"
-            style={{ backgroundColor: priorityMeta.color }}
-          />
-          {priorityMeta.label}
-        </span>
+      {/* 4. Status (Muted grey text) */}
+      <td style={{ width: "140px", padding: "14px 16px", color: "#9ca3af", fontSize: "13.5px" }}>
+        {statusMeta.label}
       </td>
 
-      {/* 5. Status */}
-      <td style={{ width: "140px" }}>
-        <span
-          className="badge"
-          style={{
-            color: statusMeta.color,
-            backgroundColor: statusMeta.bg,
-            border: `1px solid ${statusMeta.border}`,
-          }}
-        >
-          {statusMeta.label}
-        </span>
+      {/* 5. Priority (Muted grey text) */}
+      <td style={{ width: "100px", padding: "14px 16px", color: "#9ca3af", fontSize: "13.5px", textTransform: "capitalize" }}>
+        {priorityMeta.label}
       </td>
 
-      {/* 6. Assignee */}
-      <td style={{ width: "140px" }}>
-        {item.assignee ? (
-          <span style={{ color: "var(--text-primary)" }}>{item.assignee.name}</span>
-        ) : (
-          <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Unassigned</span>
-        )}
+      {/* 6. Assignee (Muted grey text) */}
+      <td style={{ width: "110px", padding: "14px 16px", color: "#9ca3af", fontSize: "13.5px" }}>
+        {assigneeDisplay}
       </td>
 
-      {/* 7. Due Date */}
-      <td style={{ width: "150px" }}>
-        {item.due_at ? (
-          <span title={formatAbsoluteDate(item.due_at)}>
-            {isOverdue ? (
-              <span className="overdue-pill">
-                ⚠️ {dueInfo.overdueText || "Overdue"}
-              </span>
-            ) : (
-              <span style={{ color: "var(--text-secondary)", fontSize: "12px" }}>
-                {dueInfo.text}
-              </span>
-            )}
-          </span>
-        ) : (
-          <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>—</span>
-        )}
+      {/* 7. Due Date (Muted grey text or overdue) */}
+      <td style={{ width: "100px", padding: "14px 16px", color: isOverdue ? "#f87171" : "#9ca3af", fontSize: "13.5px" }}>
+        {dueDisplay}
       </td>
 
-      {/* 8. Updated Ago */}
-      <td style={{ width: "100px", textAlign: "right" }}>
-        <span
-          title={formatAbsoluteDate(item.updated_at)}
-          style={{ color: "var(--text-muted)", fontSize: "12px" }}
-        >
-          {formatRelativeTime(item.updated_at)}
-        </span>
+      {/* 8. Updated Ago (Muted grey text, right-aligned) */}
+      <td
+        style={{
+          width: "90px",
+          padding: "14px 16px",
+          color: "#71717a",
+          fontSize: "13px",
+          textAlign: "right",
+        }}
+        title={formatAbsoluteDate(item.updated_at)}
+      >
+        {formatRelativeTime(item.updated_at)}
       </td>
     </tr>
   );

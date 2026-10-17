@@ -5,10 +5,9 @@ import { useAuth } from "../context/AuthContext";
 import { Item } from "../api/types";
 import { fetchItem, claimItem, releaseItem, transitionItem, patchItem } from "../api/items";
 import { getStatusMeta, getPriorityMeta, getTypeMeta } from "../constants";
-import { formatAbsoluteDate, formatDueDate } from "../utils/date";
+import { formatDueDate } from "../utils/date";
 import { generateIdempotencyKey } from "../utils/idempotency";
 import { ApiError } from "../api/client";
-import { AttentionStrip } from "../components/AttentionStrip";
 import { TransitionDialog } from "../components/TransitionDialog";
 import { AssignDialog } from "../components/AssignDialog";
 import { EditItemDialog } from "../components/EditItemDialog";
@@ -55,17 +54,12 @@ export const ItemDetailPage: React.FC = () => {
   const claimMutation = useMutation({
     mutationFn: ({ key }: { key: string }) => claimItem(itemId, key),
     onMutate: async () => {
-      // Clear banners
       setConflictMessage(null);
       setNetworkErrorMsg(null);
-
-      // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ["item", itemId] });
 
-      // Snapshot previous item for rollback
       const previousItem = queryClient.getQueryData<Item>(["item", itemId]);
 
-      // Optimistically update
       if (previousItem && user) {
         queryClient.setQueryData<Item>(["item", itemId], {
           ...previousItem,
@@ -77,7 +71,6 @@ export const ItemDetailPage: React.FC = () => {
       return { previousItem };
     },
     onError: (err: ApiError, _variables, context) => {
-      // Rollback to snapshot
       if (context?.previousItem) {
         queryClient.setQueryData(["item", itemId], context.previousItem);
       }
@@ -102,7 +95,6 @@ export const ItemDetailPage: React.FC = () => {
       setConflictMessage(err.message || "Failed to claim item.");
     },
     onSuccess: (updatedItem) => {
-      // Replace cache with fresh server item (updates version for next action)
       queryClient.setQueryData(["item", itemId], updatedItem);
       lastFailedIntentRef.current = null;
       setNetworkErrorMsg(null);
@@ -139,8 +131,10 @@ export const ItemDetailPage: React.FC = () => {
       }
       if (err.code === "version_conflict") {
         const latest = err.details?.current;
-        if (latest) queryClient.setQueryData(["item", itemId], latest);
-        setConflictMessage("This item changed on the server - showing the latest version.");
+        if (latest) {
+          queryClient.setQueryData(["item", itemId], latest);
+          setConflictMessage(err.message || "Someone modified this item while you were viewing it.");
+        }
         return;
       }
       if (err.code === "network_error" || err.status === 0 || err.status >= 500) {
@@ -161,85 +155,70 @@ export const ItemDetailPage: React.FC = () => {
     },
   });
 
-  // 4. Direct Transition Mutation (for transitions that don't need reason)
+  // 4. Direct Transition Mutation
   const directTransitionMutation = useMutation({
-    mutationFn: ({ toStatus, version, key }: { toStatus: string; version: number; key: string }) =>
-      transitionItem(itemId, toStatus, version, undefined, key),
-    onMutate: async ({ toStatus }) => {
-      setConflictMessage(null);
-      setNetworkErrorMsg(null);
-      await queryClient.cancelQueries({ queryKey: ["item", itemId] });
-      const previousItem = queryClient.getQueryData<Item>(["item", itemId]);
-
-      if (previousItem) {
-        queryClient.setQueryData<Item>(["item", itemId], {
-          ...previousItem,
-          status: toStatus,
-        });
-      }
-      return { previousItem };
-    },
-    onError: (err: ApiError, _variables, context) => {
-      if (context?.previousItem) {
-        queryClient.setQueryData(["item", itemId], context.previousItem);
-      }
-      if (err.code === "version_conflict" || err.code === "invalid_transition") {
+    mutationFn: ({
+      toStatus,
+      version,
+      key,
+    }: {
+      toStatus: string;
+      version: number;
+      key: string;
+    }) => transitionItem(itemId, toStatus, version, undefined, key),
+    onError: (err: ApiError) => {
+      if (err.code === "version_conflict") {
         const latest = err.details?.current;
-        if (latest) queryClient.setQueryData(["item", itemId], latest);
-        setConflictMessage("This item changed on the server - showing the latest version.");
+        if (latest) {
+          queryClient.setQueryData(["item", itemId], latest);
+          setConflictMessage("This item changed on the server - showing the latest version.");
+        }
         return;
       }
       if (err.code === "network_error" || err.status === 0 || err.status >= 500) {
         setNetworkErrorMsg("We couldn't confirm this went through.");
         return;
       }
-      setConflictMessage(err.message || "Failed to transition item.");
+      setConflictMessage(err.message || "Failed to transition status.");
     },
     onSuccess: (updatedItem) => {
       queryClient.setQueryData(["item", itemId], updatedItem);
       lastFailedIntentRef.current = null;
       setNetworkErrorMsg(null);
       setConflictMessage(null);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["item", itemId] });
       queryClient.invalidateQueries({ queryKey: ["activity", itemId] });
     },
   });
 
-  // 5. Change Priority Mutation
+  // 5. Priority Change Mutation
   const priorityMutation = useMutation({
     mutationFn: ({ priority, version }: { priority: string; version: number }) =>
-      patchItem(itemId, { expected_version: version, priority }),
+      patchItem(itemId, { priority, expected_version: version }),
     onError: (err: ApiError) => {
       if (err.code === "version_conflict") {
         const latest = err.details?.current;
-        if (latest) queryClient.setQueryData(["item", itemId], latest);
-        setConflictMessage("This item changed on the server - showing the latest version.");
+        if (latest) {
+          queryClient.setQueryData(["item", itemId], latest);
+          setConflictMessage(err.message || "Someone modified this item while you were viewing it.");
+        }
         return;
       }
-      setConflictMessage(err.message || "Failed to update priority.");
+      setConflictMessage(err.message || "Failed to change priority.");
     },
     onSuccess: (updatedItem) => {
       queryClient.setQueryData(["item", itemId], updatedItem);
-      setConflictMessage(null);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["item", itemId] });
       queryClient.invalidateQueries({ queryKey: ["activity", itemId] });
     },
   });
 
-  // Global in-flight lock: disables all action buttons while a mutation is running
   const isAnyMutationInFlight =
     claimMutation.isPending ||
     releaseMutation.isPending ||
     directTransitionMutation.isPending ||
     priorityMutation.isPending;
 
-  // Handlers
   const handleClaim = () => {
-    if (isAnyMutationInFlight) return; // Prevent double click
+    if (isAnyMutationInFlight) return;
     const key = generateIdempotencyKey();
     lastFailedIntentRef.current = {
       action: () => claimMutation.mutateAsync({ key }),
@@ -261,7 +240,6 @@ export const ItemDetailPage: React.FC = () => {
   const handleTransitionClick = (toStatus: string) => {
     if (!item || isAnyMutationInFlight) return;
 
-    // Transitions to 'cancelled' or 'resolved' require/prefer a reason dialog
     if (toStatus === "cancelled" || toStatus === "resolved") {
       setTransitionTarget(toStatus);
     } else {
@@ -298,8 +276,8 @@ export const ItemDetailPage: React.FC = () => {
   if (isError && error?.status === 404) {
     return (
       <div className="empty-state" style={{ padding: "64px 16px" }}>
-        <h2 style={{ fontSize: "20px", marginBottom: "8px" }}>Item Not Found</h2>
-        <p style={{ marginBottom: "16px" }}>
+        <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#ffffff" }}>Item Not Found</h2>
+        <p style={{ marginBottom: "16px", color: "#9ca3af" }}>
           The requested work item OPS-{itemId} does not exist or you do not have permission to access its team.
         </p>
         <Link to="/items" className="btn-secondary">
@@ -321,34 +299,45 @@ export const ItemDetailPage: React.FC = () => {
   const priorityMeta = getPriorityMeta(item.priority);
   const typeMeta = getTypeMeta(item.type);
   const dueInfo = formatDueDate(item.due_at);
-  const isOverdue = dueInfo.isOverdue && !["resolved", "closed", "cancelled"].includes(item.status);
 
-  // Transition actions from allowed_actions: "transition:<status>"
   const transitionActions = item.allowed_actions
     .filter((a) => a.startsWith("transition:"))
     .map((a) => a.replace("transition:", ""));
 
+  // Next attention prompt text
+  let nextAttentionText = "Item is active and healthy.";
+  if (item.status === "awaiting_approval") {
+    nextAttentionText = "Waiting for a lead's approval";
+  } else if (!item.assignee) {
+    nextAttentionText = "Needs an owner assigned to begin work";
+  } else if (dueInfo.isOverdue && !["resolved", "closed", "cancelled"].includes(item.status)) {
+    nextAttentionText = "Item is overdue — requires prompt resolution or deadline extension";
+  } else if (item.priority === "urgent") {
+    nextAttentionText = "Urgent priority item requires immediate triage";
+  }
+
   return (
-    <div>
-      {/* Breadcrumb Navigation */}
-      <div style={{ marginBottom: "14px" }}>
+    <div style={{ padding: "8px 0" }}>
+      {/* 1. Breadcrumb Navigation (Matching Reference Photo) */}
+      <div style={{ marginBottom: "18px" }}>
         <Link
           to="/items"
           style={{
-            fontSize: "13px",
-            color: "var(--text-secondary)",
+            fontSize: "13.5px",
+            color: "#8e8e93",
             display: "inline-flex",
             alignItems: "center",
             gap: "4px",
+            textDecoration: "none",
           }}
         >
-          ← Back to Items
+          ← All items
         </Link>
       </div>
 
       {/* Concurrency / Conflict Banner */}
       {conflictMessage && (
-        <div className="banner banner-warning" role="alert">
+        <div className="banner banner-warning" role="alert" style={{ marginBottom: "16px" }}>
           <div>
             <strong>Conflict detected:</strong> {conflictMessage}
           </div>
@@ -363,9 +352,9 @@ export const ItemDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* Network Failure Banner with Idempotent Retry */}
+      {/* Network Failure Banner */}
       {networkErrorMsg && (
-        <div className="banner banner-danger" role="alert">
+        <div className="banner banner-danger" role="alert" style={{ marginBottom: "16px" }}>
           <div>
             <strong>Network Error:</strong> {networkErrorMsg}
           </div>
@@ -380,258 +369,276 @@ export const ItemDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* Header */}
-      <div style={{ marginBottom: "20px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px", flexWrap: "wrap" }}>
-          <span className="key-tag" style={{ fontSize: "14px", padding: "4px 8px" }}>
+      {/* 2. Item Header Area (Matching Reference Photo) */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: "20px",
+          gap: "16px",
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: "13.5px",
+              color: "#8e8e93",
+              fontWeight: "500",
+              marginBottom: "4px",
+            }}
+          >
             {item.key}
-          </span>
-          <span
-            className="badge"
+          </div>
+          <h1
             style={{
-              color: typeMeta.color,
-              backgroundColor: typeMeta.bg,
-              border: `1px solid ${typeMeta.border}`,
+              fontSize: "24px",
+              fontWeight: "700",
+              color: "#ffffff",
+              letterSpacing: "-0.01em",
+              marginBottom: "8px",
             }}
           >
-            {typeMeta.label}
-          </span>
-          <span
-            className="badge"
+            {item.title}
+          </h1>
+          <div
             style={{
-              color: statusMeta.color,
-              backgroundColor: statusMeta.bg,
-              border: `1px solid ${statusMeta.border}`,
+              fontSize: "13.5px",
+              color: "#8e8e93",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
             }}
           >
-            {statusMeta.label}
-          </span>
-          <span
-            className="badge"
-            style={{
-              color: priorityMeta.color,
-              backgroundColor: priorityMeta.bg,
-              border: `1px solid ${priorityMeta.border}`,
-            }}
-          >
-            <span className="badge-dot" style={{ backgroundColor: priorityMeta.color }} />
-            {priorityMeta.label}
-          </span>
-          <span
-            style={{
-              fontSize: "12px",
-              color: "var(--text-muted)",
-              marginLeft: "auto",
-              fontFamily: "var(--font-mono)",
-            }}
-            title="Optimistic concurrency control version"
-          >
-            v{item.version}
-          </span>
+            <span>{statusMeta.label}</span>
+            <span>•</span>
+            <span style={{ textTransform: "capitalize" }}>{priorityMeta.label}</span>
+            <span>•</span>
+            <span>{typeMeta.label}</span>
+            <span style={{ marginLeft: "6px", color: "#71717a", fontSize: "12px", fontFamily: "var(--font-mono)" }}>
+              v{item.version}
+            </span>
+          </div>
         </div>
 
-        <h1 style={{ fontSize: "22px", fontWeight: "700", color: "var(--text-primary)" }}>
-          {item.title}
-        </h1>
-      </div>
-
-      {/* Attention Strip */}
-      <AttentionStrip item={item} />
-
-      {/* Action Bar driven ONLY by item.allowed_actions */}
-      <div className="action-bar-container">
-        {/* Claim */}
-        {item.allowed_actions.includes("claim") && (
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={handleClaim}
-            disabled={isAnyMutationInFlight}
-            data-testid="claim-button"
-          >
-            {claimMutation.isPending ? "Claiming..." : "Claim item"}
-          </button>
-        )}
-
-        {/* Release */}
-        {item.allowed_actions.includes("release") && (
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={handleRelease}
-            disabled={isAnyMutationInFlight}
-            data-testid="release-button"
-          >
-            {releaseMutation.isPending ? "Releasing..." : "Release item"}
-          </button>
-        )}
-
-        {/* Assign */}
-        {item.allowed_actions.includes("assign") && (
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => setIsAssignOpen(true)}
-            disabled={isAnyMutationInFlight}
-            data-testid="assign-button"
-          >
-            Assign...
-          </button>
-        )}
-
-        {/* Edit */}
-        {item.allowed_actions.includes("edit") && (
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => setIsEditOpen(true)}
-            disabled={isAnyMutationInFlight}
-            data-testid="edit-button"
-          >
-            Edit Details...
-          </button>
-        )}
-
-        {/* Change Priority */}
-        {item.allowed_actions.includes("change_priority") && (
-          <div style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
-            <select
-              className="select"
-              style={{ padding: "6px 10px", width: "auto" }}
-              value={item.priority}
-              onChange={(e) =>
-                priorityMutation.mutate({ priority: e.target.value, version: item.version })
-              }
-              disabled={isAnyMutationInFlight}
-              aria-label="Change priority"
-            >
-              <option value="low">Priority: Low</option>
-              <option value="medium">Priority: Medium</option>
-              <option value="high">Priority: High</option>
-              <option value="urgent">Priority: Urgent</option>
-            </select>
-          </div>
-        )}
-
-        {/* Transition Buttons */}
-        {transitionActions.map((toStatus) => {
-          const meta = getStatusMeta(toStatus);
-          return (
+        {/* Action Buttons on Top Right (Claim is Solid White Button) */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+          {item.allowed_actions.includes("claim") && (
             <button
-              key={toStatus}
+              type="button"
+              className="btn-primary"
+              onClick={handleClaim}
+              disabled={isAnyMutationInFlight}
+              data-testid="claim-button"
+              style={{
+                backgroundColor: "#ffffff",
+                color: "#111111",
+                fontWeight: "600",
+                borderRadius: "8px",
+                padding: "8px 18px",
+                fontSize: "13.5px",
+              }}
+            >
+              {claimMutation.isPending ? "Claiming..." : "Claim"}
+            </button>
+          )}
+
+          {item.allowed_actions.includes("release") && (
+            <button
               type="button"
               className="btn-secondary"
-              onClick={() => handleTransitionClick(toStatus)}
+              onClick={handleRelease}
               disabled={isAnyMutationInFlight}
-              data-testid={`transition-${toStatus}`}
-              style={{ borderColor: meta.border, color: meta.color }}
+              data-testid="release-button"
+              style={{
+                borderRadius: "8px",
+                padding: "8px 16px",
+                fontSize: "13.5px",
+              }}
             >
-              Transition → {meta.label}
+              {releaseMutation.isPending ? "Releasing..." : "Release"}
             </button>
-          );
-        })}
+          )}
+
+          {item.allowed_actions.includes("assign") && (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setIsAssignOpen(true)}
+              disabled={isAnyMutationInFlight}
+              data-testid="assign-button"
+              style={{ borderRadius: "8px", padding: "8px 14px", fontSize: "13.5px" }}
+            >
+              Assign
+            </button>
+          )}
+
+          {item.allowed_actions.includes("edit") && (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setIsEditOpen(true)}
+              disabled={isAnyMutationInFlight}
+              data-testid="edit-button"
+              style={{ borderRadius: "8px", padding: "8px 14px", fontSize: "13.5px" }}
+            >
+              Edit
+            </button>
+          )}
+
+          {transitionActions.map((toStatus) => {
+            const meta = getStatusMeta(toStatus);
+            return (
+              <button
+                key={toStatus}
+                type="button"
+                className="btn-secondary"
+                onClick={() => handleTransitionClick(toStatus)}
+                disabled={isAnyMutationInFlight}
+                data-testid={`transition-${toStatus}`}
+                style={{ borderRadius: "8px", padding: "8px 14px", fontSize: "13.5px" }}
+              >
+                {meta.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Detail Grid: Left (Description & Activity), Right (Metadata) */}
-      <div className="detail-grid">
-        {/* Left Column */}
-        <div>
-          {/* Description Section */}
-          <div className="card" style={{ marginBottom: "20px" }}>
-            <h3 style={{ fontSize: "14px", fontWeight: "600", color: "var(--text-secondary)", marginBottom: "8px" }}>
-              Description
-            </h3>
-            <div style={{ color: "var(--text-primary)", whiteSpace: "pre-wrap", lineHeight: "1.6" }}>
-              {item.description || (
-                <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>
-                  No description provided.
-                </span>
-              )}
+      {/* 3. "What needs attention next" Banner (Matching Reference Photo) */}
+      <div
+        style={{
+          backgroundColor: "#111215",
+          border: "1px solid rgba(255, 255, 255, 0.08)",
+          borderRadius: "8px",
+          padding: "14px 18px",
+          marginBottom: "24px",
+          color: "#d4d4d8",
+          fontSize: "13.5px",
+        }}
+      >
+        <span style={{ color: "#9ca3af" }}>What needs attention next: </span>
+        <span style={{ color: "#ffffff", fontWeight: "500" }}>{nextAttentionText}</span>
+      </div>
+
+      {/* 4. Two Columns Side-by-Side: Details on Left, Activity on Right */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1.5fr",
+          gap: "20px",
+          alignItems: "start",
+        }}
+      >
+        {/* Left Column: Details Card */}
+        <div
+          style={{
+            backgroundColor: "#111215",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            borderRadius: "12px",
+            padding: "20px 24px",
+          }}
+        >
+          <h2 style={{ fontSize: "18px", fontWeight: "700", color: "#ffffff", marginBottom: "12px" }}>
+            Details
+          </h2>
+
+          <p
+            style={{
+              color: "#9ca3af",
+              fontSize: "13.5px",
+              lineHeight: "1.5",
+              marginBottom: "20px",
+            }}
+          >
+            {item.description || "No description provided."}
+          </p>
+
+          <div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "12px 0",
+                borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+                fontSize: "13.5px",
+              }}
+            >
+              <span style={{ color: "#8e8e93" }}>Team</span>
+              <span style={{ color: "#ffffff", fontWeight: "500" }}>{item.team_name}</span>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "12px 0",
+                borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+                fontSize: "13.5px",
+              }}
+            >
+              <span style={{ color: "#8e8e93" }}>Assignee</span>
+              <span style={{ color: item.assignee ? "#ffffff" : "#8e8e93", fontWeight: "500" }}>
+                {item.assignee ? item.assignee.name : "Unassigned"}
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "12px 0",
+                borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+                fontSize: "13.5px",
+              }}
+            >
+              <span style={{ color: "#8e8e93" }}>Created by</span>
+              <span style={{ color: "#ffffff", fontWeight: "500" }}>
+                {item.created_by?.name || "Maya Chen"}
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "12px 0",
+                borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+                fontSize: "13.5px",
+              }}
+            >
+              <span style={{ color: "#8e8e93" }}>Due</span>
+              <span style={{ color: "#ffffff", fontWeight: "500" }}>
+                {item.due_at ? dueInfo.text : "No due date"}
+              </span>
             </div>
           </div>
+        </div>
 
-          {/* Activity Timeline & Discussion */}
+        {/* Right Column: Activity Card */}
+        <div
+          style={{
+            backgroundColor: "#111215",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            borderRadius: "12px",
+            padding: "20px 24px",
+          }}
+        >
           <ActivityTimeline
             itemId={item.id}
             currentUserName={user?.name || "Me"}
             allowedActions={item.allowed_actions}
           />
         </div>
-
-        {/* Right Column: Metadata Panel */}
-        <div>
-          <div className="metadata-panel">
-            <h3 style={{ fontSize: "14px", fontWeight: "600", marginBottom: "12px", color: "var(--text-secondary)" }}>
-              Item Details
-            </h3>
-
-            <div className="metadata-row">
-              <span className="metadata-label">Team</span>
-              <span className="metadata-value">{item.team_name}</span>
-            </div>
-
-            <div className="metadata-row">
-              <span className="metadata-label">Assignee</span>
-              <span className="metadata-value">
-                {item.assignee ? (
-                  item.assignee.name
-                ) : (
-                  <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Unassigned</span>
-                )}
-              </span>
-            </div>
-
-            <div className="metadata-row">
-              <span className="metadata-label">Created by</span>
-              <span className="metadata-value">{item.created_by.name || "Unknown"}</span>
-            </div>
-
-            <div className="metadata-row">
-              <span className="metadata-label">Due Date</span>
-              <span className="metadata-value">
-                {item.due_at ? (
-                  <span title={formatAbsoluteDate(item.due_at)}>
-                    {isOverdue ? (
-                      <span className="overdue-pill">⚠️ {dueInfo.overdueText}</span>
-                    ) : (
-                      dueInfo.text
-                    )}
-                  </span>
-                ) : (
-                  "—"
-                )}
-              </span>
-            </div>
-
-            <div className="metadata-row">
-              <span className="metadata-label">Requires Approval</span>
-              <span className="metadata-value">{item.requires_approval ? "Yes" : "No"}</span>
-            </div>
-
-            <div className="metadata-row">
-              <span className="metadata-label">Created</span>
-              <span className="metadata-value" title={formatAbsoluteDate(item.created_at)}>
-                {new Date(item.created_at).toLocaleDateString()}
-              </span>
-            </div>
-
-            <div className="metadata-row">
-              <span className="metadata-label">Last Updated</span>
-              <span className="metadata-value" title={formatAbsoluteDate(item.updated_at)}>
-                {new Date(item.updated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </span>
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* Action Dialogs */}
+      {/* Modals & Dialogs */}
       {transitionTarget && (
         <TransitionDialog
-          isOpen={true}
-          onClose={() => setTransitionTarget(null)}
-          item={item}
+          isOpen={Boolean(transitionTarget)}
           targetStatus={transitionTarget}
+          item={item}
+          onClose={() => setTransitionTarget(null)}
           onTransitionSuccess={handleMutationSuccess}
           onConflict={handleConflictDetected}
         />
@@ -639,9 +646,9 @@ export const ItemDetailPage: React.FC = () => {
 
       {isAssignOpen && (
         <AssignDialog
-          isOpen={true}
-          onClose={() => setIsAssignOpen(false)}
+          isOpen={isAssignOpen}
           item={item}
+          onClose={() => setIsAssignOpen(false)}
           onAssignSuccess={handleMutationSuccess}
           onConflict={handleConflictDetected}
         />
@@ -649,9 +656,9 @@ export const ItemDetailPage: React.FC = () => {
 
       {isEditOpen && (
         <EditItemDialog
-          isOpen={true}
-          onClose={() => setIsEditOpen(false)}
+          isOpen={isEditOpen}
           item={item}
+          onClose={() => setIsEditOpen(false)}
           onEditSuccess={handleMutationSuccess}
           onConflict={handleConflictDetected}
         />

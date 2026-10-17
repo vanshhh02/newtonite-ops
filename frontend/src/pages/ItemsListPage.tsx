@@ -42,7 +42,6 @@ export const ItemsListPage: React.FC = () => {
     [view, effectiveTeamId, types.join(","), statuses.join(","), priorities.join(","), assignee, q, sort]
   );
 
-  // Stable query key ensures cache isolation and no refetch storms
   const queryKey = useMemo(() => ["items", filterParams], [filterParams]);
 
   const {
@@ -53,7 +52,6 @@ export const ItemsListPage: React.FC = () => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-    isFetching,
     refetch,
   } = useInfiniteQuery({
     queryKey,
@@ -65,54 +63,64 @@ export const ItemsListPage: React.FC = () => {
     refetchOnWindowFocus: true,
   });
 
-  // Flatten items across all cursor pages
   const items = useMemo(() => {
     return data?.pages.flatMap((page) => page.items) ?? [];
   }, [data]);
 
   return (
-    <div>
-      {/* Page Header */}
+    <div style={{ padding: "8px 0" }}>
+      {/* 1. Page Header (Matching Image 3) */}
       <div
         style={{
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-start",
           justifyContent: "space-between",
-          marginBottom: "16px",
-          flexWrap: "wrap",
-          gap: "12px",
+          marginBottom: "20px",
+          gap: "16px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "baseline", gap: "12px" }}>
-          <h1 style={{ fontSize: "20px", fontWeight: "700", color: "var(--text-primary)" }}>
-            Operations Items
+        <div>
+          <h1
+            style={{
+              fontSize: "24px",
+              fontWeight: "700",
+              color: "#ffffff",
+              letterSpacing: "-0.01em",
+              marginBottom: "4px",
+            }}
+          >
+            Items
           </h1>
-          {isFetching && !isLoading && !isFetchingNextPage && (
-            <span
-              style={{
-                fontSize: "12px",
-                color: "var(--accent-primary)",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "4px",
-              }}
-            >
-              ● Refreshing...
-            </span>
-          )}
+          <p style={{ color: "#8e8e93", fontSize: "14px" }}>
+            Filter results without loading the whole operation.
+          </p>
         </div>
 
-        <Link to="/items/new" className="btn-primary" style={{ textDecoration: "none" }}>
-          + New Item
+        <Link
+          to="/items/new"
+          className="btn-primary"
+          style={{
+            backgroundColor: "#ffffff",
+            color: "#111111",
+            fontWeight: "600",
+            borderRadius: "8px",
+            padding: "8px 18px",
+            fontSize: "13.5px",
+            textDecoration: "none",
+            display: "inline-flex",
+            alignItems: "center",
+          }}
+        >
+          New item
         </Link>
       </div>
 
-      {/* Filter and View Controls (URL Source of Truth) */}
+      {/* 2. Filter Bar (Tabs + Filter Inputs) */}
       <ItemsFilterBar />
 
       {/* Error State */}
       {isError && (
-        <div className="banner banner-danger" role="alert">
+        <div className="banner banner-danger" role="alert" style={{ marginBottom: "16px" }}>
           <div>
             <strong>Error loading items:</strong>{" "}
             {(error as any)?.message || "Failed to communicate with server."}
@@ -123,69 +131,84 @@ export const ItemsListPage: React.FC = () => {
         </div>
       )}
 
-      {/* Data Table Container */}
-      <div className="table-container">
-        <table className="data-table" aria-label="Work items list">
+      {/* 3. Items Data Table in Rounded Card (Matching Image 3) */}
+      <div
+        style={{
+          backgroundColor: "#111215",
+          border: "1px solid rgba(255, 255, 255, 0.08)",
+          borderRadius: "12px",
+          overflow: "hidden",
+        }}
+      >
+        <table
+          className="data-table"
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            textAlign: "left",
+            fontSize: "13.5px",
+          }}
+        >
           <thead>
-            <tr>
-              <th scope="col">Key</th>
-              <th scope="col">Title</th>
-              <th scope="col">Type</th>
-              <th scope="col">Priority</th>
-              <th scope="col">Status</th>
-              <th scope="col">Assignee</th>
-              <th scope="col">Due Date</th>
-              <th scope="col" style={{ textAlign: "right" }}>
-                Updated
-              </th>
+            <tr
+              style={{
+                borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+              }}
+            >
+              <th style={{ padding: "14px 16px", color: "#71717a", fontWeight: "500", fontSize: "13px" }}>Key</th>
+              <th style={{ padding: "14px 16px", color: "#71717a", fontWeight: "500", fontSize: "13px" }}>Title</th>
+              <th style={{ padding: "14px 16px", color: "#71717a", fontWeight: "500", fontSize: "13px" }}>Type</th>
+              <th style={{ padding: "14px 16px", color: "#71717a", fontWeight: "500", fontSize: "13px" }}>Status</th>
+              <th style={{ padding: "14px 16px", color: "#71717a", fontWeight: "500", fontSize: "13px" }}>Priority</th>
+              <th style={{ padding: "14px 16px", color: "#71717a", fontWeight: "500", fontSize: "13px" }}>Assignee</th>
+              <th style={{ padding: "14px 16px", color: "#71717a", fontWeight: "500", fontSize: "13px" }}>Due</th>
+              <th style={{ padding: "14px 16px", color: "#71717a", fontWeight: "500", fontSize: "13px", textAlign: "right" }}>Updated</th>
             </tr>
           </thead>
           <tbody>
-            {/* Loading Skeleton */}
-            {isLoading && (
+            {isLoading && items.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: "center", padding: "40px" }}>
-                  <div style={{ color: "var(--text-secondary)" }}>Loading work items...</div>
+                <td colSpan={8} style={{ textAlign: "center", padding: "48px 16px", color: "#8e8e93" }}>
+                  Loading operations items...
                 </td>
               </tr>
-            )}
-
-            {/* Empty State */}
-            {!isLoading && items.length === 0 && (
+            ) : items.length === 0 ? (
               <tr>
-                <td colSpan={8}>
-                  <div className="empty-state">
-                    <h3>No items found</h3>
-                    <p>There are no operational items matching your current filters and view criteria.</p>
-                  </div>
+                <td colSpan={8} style={{ textAlign: "center", padding: "48px 16px", color: "#8e8e93" }}>
+                  No items match the active filters.
                 </td>
               </tr>
+            ) : (
+              items.map((item) => <ItemRow key={item.id} item={item} />)
             )}
-
-            {/* Render Rows */}
-            {!isLoading && items.map((item) => <ItemRow key={item.id} item={item} />)}
           </tbody>
         </table>
 
-        {/* Keyset Cursor Pagination Footer */}
-        {!isLoading && items.length > 0 && (
-          <div className="pagination-footer">
-            <span>
-              Showing <strong>{items.length}</strong> items
-            </span>
-
-            {hasNextPage ? (
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={isFetchingNextPage}
-                onClick={() => fetchNextPage()}
-              >
-                {isFetchingNextPage ? "Loading more items..." : "Load more (50 items)"}
-              </button>
-            ) : (
-              <span style={{ color: "var(--text-muted)" }}>All matching items loaded</span>
-            )}
+        {/* Cursor Pagination Footer */}
+        {hasNextPage && (
+          <div
+            style={{
+              padding: "16px",
+              textAlign: "center",
+              borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+            }}
+          >
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              style={{
+                borderRadius: "8px",
+                padding: "8px 20px",
+                fontSize: "13px",
+                color: "#ffffff",
+                backgroundColor: "#18191e",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+              }}
+            >
+              {isFetchingNextPage ? "Loading more items..." : "Load more"}
+            </button>
           </div>
         )}
       </div>
