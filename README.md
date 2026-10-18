@@ -4,8 +4,29 @@ Newtonite Ops is an internal operational command center designed to replace chao
 
 ---
 
+## 🎬 Product Demo Video (2.5 Minutes)
+
+A complete 2.5-minute end-to-end walkthrough demonstrating high-concurrency race handling, optimistic UI, cross-team RBAC, transactional outbox notifications, and automated test execution:
+
+[![Newtonite Ops Demo Video](docs/demo-thumbnail.png)](docs/demo.mp4)
+
+> 🎥 **Direct Playback & Downloads**:
+> - [▶️ **Watch / Download MP4 Video** (`docs/demo.mp4`)](docs/demo.mp4) *(2.7 MB, Universal browser playback)*
+> - [▶️ **Watch / Download QuickTime Video** (`docs/demo.mov`)](docs/demo.mov) *(3.3 MB, Original screen recording)*
+>
+> **Core scenarios covered in the demo**:
+> 1. **Live Operational Dashboard**: Real-time aggregation of active items, incidents, and approvals.
+> 2. **Keyset Cursor Pagination**: Server-side filtering, searching, and sorting with instant URL round-trip.
+> 3. **Concurrency Under Pressure**: In-flight button debounce, optimistic updates, and automatic reconciliation on `409 Conflict`.
+> 4. **Cross-Team RBAC**: Maya Chen's permissions switching between Core Platform (Lead) and Payments & Risk (Viewer).
+> 5. **Transactional Outbox Worker**: At-least-once notification generation via `FOR UPDATE SKIP LOCKED`.
+> 6. **Automated Test Suite**: 37/37 tests passing (21 backend + 16 frontend).
+
+---
+
 ## Table of Contents
 
+- [🎬 Product Demo Video (2.5 Minutes)](#-product-demo-video-25-minutes)
 - [Prerequisites](#prerequisites)
 - [Option 1: Quick Start with Docker (Recommended)](#option-1-quick-start-with-docker-recommended)
 - [Option 2: Running Locally from Source (Step-by-Step)](#option-2-running-locally-from-source-step-by-step)
