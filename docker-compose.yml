@@ -56,17 +56,16 @@ services:
       PYTHONUNBUFFERED: "1"
     command: ["python", "-m", "app.worker"]
 
-  # TODO: Web frontend service (built separately)
-  # Uncomment when frontend/Dockerfile is available:
-  # web:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   container_name: newtonite-web
-  #   ports:
-  #     - "5173:5173"
-  #   depends_on:
-  #     - api
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: newtonite-web
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
 
 volumes:
   pgdata:
