@@ -27,6 +27,13 @@ test-frontend:
 		echo "frontend/ directory is empty or not yet initialized; skipping frontend tests."; \
 	fi
 
+run:
+	@echo "Starting fullstack development servers (backend on :8000, frontend on :5173)..."
+	@(trap 'kill 0' SIGINT SIGTERM EXIT; \
+	  PYTHONPATH=backend $(PYTHON) -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --app-dir backend & \
+	  (cd frontend && npm run dev) & \
+	  wait)
+
 dev:
 	@echo "Starting backend development server on http://localhost:8000..."
 	@PYTHONPATH=backend $(PYTHON) -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --app-dir backend
