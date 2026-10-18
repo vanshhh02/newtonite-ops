@@ -26,7 +26,7 @@ A complete 2.5-minute end-to-end walkthrough demonstrating high-concurrency race
 
 ## Table of Contents
 
-- [🎬 Product Demo Video (2.5 Minutes)](#-product-demo-video-25-minutes)
+- [🎬 Product Demo Video ](#-product-demo-video-25-minutes)
 - [Prerequisites](#prerequisites)
 - [Option 1: Quick Start with Docker (Recommended)](#option-1-quick-start-with-docker-recommended)
 - [Option 2: Running Locally from Source (Step-by-Step)](#option-2-running-locally-from-source-step-by-step)
