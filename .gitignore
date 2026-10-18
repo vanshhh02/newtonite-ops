@@ -52,3 +52,4 @@ frontend/coverage/
 .vscode/
 *.swp
 *.swo
+fresh-eval/

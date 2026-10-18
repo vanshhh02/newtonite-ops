@@ -1,8 +1,10 @@
 .PHONY: test test-backend test-frontend run dev worker seed seed-large migrate docker-up docker-down
 
-PYTHON ?= .venv/bin/python
-PYTEST ?= .venv/bin/pytest
-ALEMBIC ?= .venv/bin/alembic
+# Auto-detect Python virtualenv whether located in backend/.venv or .venv/
+VENV_DIR ?= $(shell [ -d backend/.venv ] && echo "backend/.venv" || ([ -d .venv ] && echo ".venv" || echo ""))
+PYTHON   ?= $(if $(VENV_DIR),$(VENV_DIR)/bin/python,python3)
+PYTEST   ?= $(if $(VENV_DIR),$(VENV_DIR)/bin/pytest,pytest)
+ALEMBIC  ?= $(if $(VENV_DIR),$(VENV_DIR)/bin/alembic,alembic)
 
 export TEST_DATABASE_URL ?= postgresql://postgres:postgres@localhost:5432/newtonite_test
 export DATABASE_URL ?= postgresql://postgres:postgres@localhost:5432/newtonite
@@ -15,39 +17,35 @@ test: test-backend test-frontend
 
 test-backend:
 	@echo "Running backend test suite against PostgreSQL..."
-	@if [ -f "$(PYTEST)" ]; then \
-		$(PYTEST) -v backend/tests; \
-	else \
-		pytest -v backend/tests; \
-	fi
+	@$(PYTEST) -v backend/tests
 
 test-frontend:
 	@if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then \
 		echo "Running frontend test suite..."; \
-		(cd frontend && npm ci && npm test -- --run); \
+		(cd frontend && ([ -d "node_modules" ] || npm install) && npm test -- --run); \
 	else \
 		echo "frontend/ directory is empty or not yet initialized; skipping frontend tests."; \
 	fi
 
 dev:
 	@echo "Starting backend development server on http://localhost:8000..."
-	@cd backend && ../$(PYTHON) -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+	@PYTHONPATH=backend $(PYTHON) -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --app-dir backend
 
 worker:
 	@echo "Starting outbox background worker..."
-	@cd backend && ../$(PYTHON) -m app.worker
+	@PYTHONPATH=backend $(PYTHON) -m app.worker
 
 migrate:
 	@echo "Applying database migrations..."
-	@cd backend && ../$(ALEMBIC) upgrade head
+	@(cd backend && $(if $(filter backend/%,$(ALEMBIC)),./.venv/bin/alembic,../$(ALEMBIC)) upgrade head)
 
 seed:
 	@echo "Seeding small dataset (~5,000 items, 12 users, 4 teams)..."
-	@cd backend && ../$(PYTHON) -m app.seed --scale small
+	@PYTHONPATH=backend $(PYTHON) -m app.seed --scale small
 
 seed-large:
 	@echo "Seeding large dataset (50,000+ items, 500,000+ events)..."
-	@cd backend && ../$(PYTHON) -m app.seed --scale large
+	@PYTHONPATH=backend $(PYTHON) -m app.seed --scale large
 
 docker-up:
 	docker compose up --build
