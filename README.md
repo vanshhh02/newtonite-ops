@@ -4,7 +4,7 @@ Newtonite Ops is an internal operational command center designed to replace chao
 
 ---
 
-## 🎬 Product Demo Video (2.5 Minutes)
+## 🎬 Product Demo Video 
 
 A complete 2.5-minute end-to-end walkthrough demonstrating high-concurrency race handling, optimistic UI, cross-team RBAC, transactional outbox notifications, and automated test execution:
 
